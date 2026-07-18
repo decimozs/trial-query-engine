@@ -87,9 +87,9 @@ def test_query_streams_events_and_logs_chat_history(monkeypatch) -> None:
         yield "Participants "
         yield "had Type 2 Diabetes."
 
-    monkeypatch.setattr("app.api.query.embed_query_async", fake_embed_query)
-    monkeypatch.setattr("app.api.query.search_similar_chunks", fake_search_similar_chunks)
-    monkeypatch.setattr("app.api.query.generate_answer", fake_generate_answer)
+    monkeypatch.setattr("app.services.query_workflow.embed_query_async", fake_embed_query)
+    monkeypatch.setattr("app.services.query_workflow.search_similar_chunks", fake_search_similar_chunks)
+    monkeypatch.setattr("app.services.query_workflow.generate_answer", fake_generate_answer)
 
     with TestClient(app) as client:
         try:
@@ -143,7 +143,7 @@ def test_query_with_no_chunks_returns_grounded_fallback_and_logs(monkeypatch) ->
     async def fake_embed_query(_: str) -> list[float]:
         return [0.1] * 384
 
-    monkeypatch.setattr("app.api.query.embed_query_async", fake_embed_query)
+    monkeypatch.setattr("app.services.query_workflow.embed_query_async", fake_embed_query)
 
     async def fake_search_similar_chunks(session, query_embedding, question, top_k, filters):
         return []
@@ -152,8 +152,8 @@ def test_query_with_no_chunks_returns_grounded_fallback_and_logs(monkeypatch) ->
         raise AssertionError("LLM should not be called without retrieved chunks")
         yield ""
 
-    monkeypatch.setattr("app.api.query.search_similar_chunks", fake_search_similar_chunks)
-    monkeypatch.setattr("app.api.query.generate_answer", fail_generate_answer)
+    monkeypatch.setattr("app.services.query_workflow.search_similar_chunks", fake_search_similar_chunks)
+    monkeypatch.setattr("app.services.query_workflow.generate_answer", fail_generate_answer)
 
     with TestClient(app) as client:
         try:
@@ -185,7 +185,7 @@ def test_query_prompt_injection_guardrail_blocks_before_retrieval(monkeypatch) -
     async def fail_embed_query(_: str) -> list[float]:
         raise AssertionError("embedding should not run for blocked input")
 
-    monkeypatch.setattr("app.api.query.embed_query_async", fail_embed_query)
+    monkeypatch.setattr("app.services.query_workflow.embed_query_async", fail_embed_query)
 
     with TestClient(app) as client:
         try:
@@ -237,9 +237,9 @@ def test_query_output_guardrail_replaces_ungrounded_answer(monkeypatch) -> None:
     async def fake_generate_answer(prompt: str):
         yield "The trial proves a cure using Martian minerals."
 
-    monkeypatch.setattr("app.api.query.embed_query_async", fake_embed_query)
-    monkeypatch.setattr("app.api.query.search_similar_chunks", fake_search_similar_chunks)
-    monkeypatch.setattr("app.api.query.generate_answer", fake_generate_answer)
+    monkeypatch.setattr("app.services.query_workflow.embed_query_async", fake_embed_query)
+    monkeypatch.setattr("app.services.query_workflow.search_similar_chunks", fake_search_similar_chunks)
+    monkeypatch.setattr("app.services.query_workflow.generate_answer", fake_generate_answer)
 
     with TestClient(app) as client:
         try:
@@ -273,8 +273,8 @@ def test_query_rate_limit_returns_429(monkeypatch) -> None:
     async def fake_search_similar_chunks(session, query_embedding, question, top_k, filters):
         return []
 
-    monkeypatch.setattr("app.api.query.embed_query_async", fake_embed_query)
-    monkeypatch.setattr("app.api.query.search_similar_chunks", fake_search_similar_chunks)
+    monkeypatch.setattr("app.services.query_workflow.embed_query_async", fake_embed_query)
+    monkeypatch.setattr("app.services.query_workflow.search_similar_chunks", fake_search_similar_chunks)
 
     with TestClient(app) as client:
         try:

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models import Document, DocumentChunk
 from app.schemas.query import RetrievedChunk
-from app.services.ingestion import get_embedding_model
+from app.services.embeddings import get_embedding_model
 
 
 def embed_query(question: str) -> list[float]:

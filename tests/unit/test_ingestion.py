@@ -104,3 +104,38 @@ async def test_fetch_studies_follows_next_page_token(monkeypatch) -> None:
         "NCT00000002",
     ]
     assert len(requests) == 2
+
+
+@pytest.mark.anyio
+async def test_ingest_studies_failure_records_fetched_count(monkeypatch) -> None:
+    failure_payload = {}
+
+    async def fake_fetch_studies(condition: str, max_studies: int):
+        return [sample_study("NCT00000001"), sample_study("NCT00000002")]
+
+    async def fake_start_ingestion_run(condition: str, studies_fetched: int):
+        assert studies_fetched == 2
+        return "run-1"
+
+    async def fake_store_raw_document(study):
+        return True
+
+    async def fail_embed_chunks_async(chunks):
+        raise RuntimeError("embedding failed")
+
+    async def fake_fail_ingestion_run(run_id, **kwargs):
+        failure_payload["run_id"] = run_id
+        failure_payload.update(kwargs)
+
+    monkeypatch.setattr(ingestion, "fetch_studies", fake_fetch_studies)
+    monkeypatch.setattr(ingestion, "start_ingestion_run", fake_start_ingestion_run)
+    monkeypatch.setattr(ingestion, "store_raw_document", fake_store_raw_document)
+    monkeypatch.setattr(ingestion, "embed_chunks_async", fail_embed_chunks_async)
+    monkeypatch.setattr(ingestion, "fail_ingestion_run", fake_fail_ingestion_run)
+
+    with pytest.raises(RuntimeError, match="embedding failed"):
+        await ingestion.ingest_studies("diabetes", 2, session=None)
+
+    assert failure_payload["run_id"] == "run-1"
+    assert failure_payload["studies_fetched"] == 2
+    assert failure_payload["studies_ingested"] == 0

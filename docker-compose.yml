@@ -55,7 +55,7 @@ services:
       retries: 10
 
   mongo:
-    image: mongo:8.0
+    image: mongo@sha256:951c2ff9fc6bdb6cb89b1dfea4a0e8ae3ee4fb287c0bf579b2bba54c7803f75d
     container_name: mongo-trial-query-engine-compose
     ports:
       - "${MONGO_PORT:-27018}:27017"

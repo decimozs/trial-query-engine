@@ -1,34 +1,23 @@
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from functools import lru_cache
 from hashlib import sha256
 from typing import Any
 
 import asyncio
-import httpx
 import anyio
+import httpx
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import Document, DocumentChunk
-from app.mongo.client import mongo_db
-
-
-@dataclass(frozen=True)
-class StudyMetadata:
-    nct_id: str
-    title: str
-    condition: str | None
-    phase: str | None
-    status: str | None
-    brief_summary: str
-
-
-@dataclass(frozen=True)
-class StudyTextSection:
-    source: str
-    text: str
+from app.services.embeddings import get_embedding_model
+from app.services.ingestion_types import StudyMetadata, StudyTextSection
+from app.services.persistence import (
+    complete_ingestion_run,
+    fail_ingestion_run,
+    start_ingestion_run,
+    store_raw_document as persist_raw_document,
+)
 
 
 def get_nested(data: dict[str, Any], path: tuple[str, ...]) -> Any:
@@ -160,16 +149,7 @@ async def store_raw_document(study: dict[str, Any]) -> bool:
     if metadata is None:
         return False
 
-    await mongo_db.raw_documents.replace_one(
-        {"_id": metadata.nct_id},
-        {
-            "_id": metadata.nct_id,
-            "source": "clinicaltrials.gov",
-            "fetched_at": datetime.now(timezone.utc),
-            "raw": study,
-        },
-        upsert=True,
-    )
+    await persist_raw_document(metadata, study)
     return True
 
 
@@ -207,13 +187,6 @@ def chunk_sections(sections: list[StudyTextSection]) -> list[StudyTextSection]:
 def make_chunk_uid(nct_id: str, source: str, chunk_index: int, chunk_text: str) -> str:
     value = f"{nct_id}\0{source}\0{chunk_index}\0{chunk_text}".encode("utf-8")
     return sha256(value).hexdigest()
-
-
-@lru_cache(maxsize=1)
-def get_embedding_model():
-    from sentence_transformers import SentenceTransformer
-
-    return SentenceTransformer(settings.embedding_model_name)
 
 
 def embed_chunks(chunks: list[str]) -> list[list[float]]:
@@ -290,23 +263,13 @@ async def ingest_studies(
 ) -> int:
     started_at = datetime.now(timezone.utc)
     run_id = None
+    studies: list[dict[str, Any]] = []
     ingested = 0
     skipped = 0
 
     try:
         studies = await fetch_studies(condition, max_studies)
-        run = await mongo_db.ingestion_runs.insert_one(
-            {
-                "condition_queried": condition,
-                "studies_fetched": len(studies),
-                "studies_ingested": 0,
-                "studies_skipped": 0,
-                "started_at": started_at,
-                "status": "success",
-                "error": None,
-            }
-        )
-        run_id = run.inserted_id
+        run_id = await start_ingestion_run(condition, len(studies))
 
         for study in studies:
             metadata = extract_metadata(study)
@@ -323,44 +286,21 @@ async def ingest_studies(
             else:
                 skipped += 1
 
-        await mongo_db.ingestion_runs.update_one(
-            {"_id": run_id},
-            {
-                "$set": {
-                    "studies_ingested": ingested,
-                    "studies_skipped": skipped,
-                    "completed_at": datetime.now(timezone.utc),
-                    "status": "success",
-                }
-            },
+        await complete_ingestion_run(
+            run_id,
+            studies_ingested=ingested,
+            studies_skipped=skipped,
         )
     except Exception as exc:
-        if run_id is None:
-            await mongo_db.ingestion_runs.insert_one(
-                {
-                    "condition_queried": condition,
-                    "studies_fetched": 0,
-                    "studies_ingested": ingested,
-                    "studies_skipped": skipped,
-                    "started_at": started_at,
-                    "completed_at": datetime.now(timezone.utc),
-                    "status": "failed",
-                    "error": str(exc),
-                }
-            )
-        else:
-            await mongo_db.ingestion_runs.update_one(
-                {"_id": run_id},
-                {
-                    "$set": {
-                        "studies_ingested": ingested,
-                        "studies_skipped": skipped,
-                        "completed_at": datetime.now(timezone.utc),
-                        "status": "failed",
-                        "error": str(exc),
-                    }
-                },
-            )
+        await fail_ingestion_run(
+            run_id,
+            condition=condition,
+            studies_fetched=len(studies),
+            studies_ingested=ingested,
+            studies_skipped=skipped,
+            started_at=started_at,
+            error=str(exc),
+        )
         raise
 
     return ingested
