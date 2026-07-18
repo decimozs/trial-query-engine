@@ -1,0 +1,28 @@
+[project]
+name = "trial-query-engine"
+version = "0.1.0"
+description = "FastAPI clinical-trial assistant with pgvector retrieval, MongoDB audit logs, and Anthropic-backed RAG"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.18.5",
+    "anthropic>=0.117.0",
+    "asyncpg>=0.31.0",
+    "bcrypt<4.1",
+    "fastapi[standard]>=0.139.2",
+    "httpx>=0.28.1",
+    "passlib[bcrypt]>=1.7.4",
+    "pgvector>=0.5.0",
+    "pydantic-settings>=2.14.2",
+    "pymongo>=4.17.0",
+    "python-dotenv>=1.2.2",
+    "python-jose[cryptography]>=3.5.0",
+    "sentence-transformers>=5.6.0",
+    "slowapi>=0.1.10",
+    "sqlalchemy>=2.0.51",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

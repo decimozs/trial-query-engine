@@ -1,0 +1,72 @@
+services:
+  api:
+    build: .
+    container_name: api-trial-query-engine
+    environment:
+      APP_NAME: trial-query-engine
+      ENVIRONMENT: local
+      DEBUG: "true"
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/hcp_clinical_trial_assistant
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB_NAME: hcp_clinical_trial_assistant
+      JWT_SECRET_KEY: change-me-in-local-dev
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      CLINICALTRIALS_BASE_URL: https://clinicaltrials.gov/api/v2
+      CLINICALTRIALS_PAGE_DELAY_SECONDS: ${CLINICALTRIALS_PAGE_DELAY_SECONDS:-0.2}
+      EMBEDDING_MODEL_NAME: sentence-transformers/all-MiniLM-L6-v2
+      INGEST_DEFAULT_MAX_STUDIES: "200"
+      INGEST_PAGE_SIZE: "100"
+      CHUNK_SIZE_WORDS: "500"
+      CHUNK_OVERLAP_WORDS: "50"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
+      ANTHROPIC_MAX_TOKENS: ${ANTHROPIC_MAX_TOKENS:-1024}
+      RAG_TOP_K: ${RAG_TOP_K:-5}
+      RAG_MAX_COSINE_DISTANCE: ${RAG_MAX_COSINE_DISTANCE:-1.2}
+      RAG_SEMANTIC_WEIGHT: ${RAG_SEMANTIC_WEIGHT:-0.7}
+      RAG_KEYWORD_WEIGHT: ${RAG_KEYWORD_WEIGHT:-0.3}
+      QUERY_RATE_LIMIT: ${QUERY_RATE_LIMIT:-10/minute}
+      GUARDRAIL_MAX_QUESTION_CHARS: ${GUARDRAIL_MAX_QUESTION_CHARS:-2000}
+      GUARDRAIL_MIN_GROUNDING_OVERLAP: ${GUARDRAIL_MIN_GROUNDING_OVERLAP:-0.12}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: pg-trial-query-engine-compose
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hcp_clinical_trial_assistant
+    ports:
+      - "${POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hcp_clinical_trial_assistant"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:8.0
+    container_name: mongo-trial-query-engine-compose
+    ports:
+      - "${MONGO_PORT:-27018}:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' | grep 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  mongo_data:
