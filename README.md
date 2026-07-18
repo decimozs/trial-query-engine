@@ -89,7 +89,7 @@ cp .env.example .env
 ## Search Flow
 
 ```mermaid
-flowchart TD
+flowchart LR
     Question["Question"] --> InputGuardrails["Input guardrails<br/>prompt injection, PII, scope, length"]
     InputGuardrails --> BlockInput{"Blocked?"}
     BlockInput -- "Yes" --> Refusal["Structured refusal"]
