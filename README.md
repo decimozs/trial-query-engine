@@ -78,41 +78,13 @@ API docs:
 http://localhost:8000/docs
 ```
 
-## Environment Variables
+## Environment
 
-Start from `.env.example`:
+Copy the example environment file, then fill in any local values you need:
 
-```text
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:15432/hcp_clinical_trial_assistant
-MONGO_URL=mongodb://localhost:27018
-MONGO_DB_NAME=hcp_clinical_trial_assistant
-JWT_SECRET_KEY=change-me-in-local-dev
-ANTHROPIC_API_KEY=
-ANTHROPIC_MODEL=claude-sonnet-5
-CLINICALTRIALS_PAGE_DELAY_SECONDS=0.2
-RAG_TOP_K=5
-RAG_MAX_COSINE_DISTANCE=1.2
-RAG_SEMANTIC_WEIGHT=0.7
-RAG_KEYWORD_WEIGHT=0.3
-QUERY_RATE_LIMIT=10/minute
-GUARDRAIL_MAX_QUESTION_CHARS=2000
-GUARDRAIL_MIN_GROUNDING_OVERLAP=0.12
+```bash
+cp .env.example .env
 ```
-
-Never commit `.env`.
-
-## API Overview
-
-| Endpoint | Method | Auth | Purpose |
-|---|---:|---|---|
-| `/auth/register` | POST | none | Create a user |
-| `/auth/login` | POST | none | Get a JWT access token |
-| `/me` | GET | user | Return current user info |
-| `/admin/check` | GET | admin | Verify admin access |
-| `/documents/ingest` | POST | admin | Pull and embed studies from ClinicalTrials.gov |
-| `/query` | POST | user | Ask a question and stream a grounded answer |
-| `/stats` | GET | none | Show document counts, chunk counts, and latency stats |
-| `/health` | GET | none | Check Postgres and MongoDB health |
 
 ## Common Commands
 
