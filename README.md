@@ -86,96 +86,37 @@ Copy the example environment file, then fill in any local values you need:
 cp .env.example .env
 ```
 
-## Common Commands
+## Search Flow
 
-Run the app:
+```mermaid
+flowchart TD
+    Question["Question"] --> InputGuardrails["Input guardrails<br/>prompt injection, PII, scope, length"]
+    InputGuardrails --> BlockInput{"Blocked?"}
+    BlockInput -- "Yes" --> Refusal["Structured refusal"]
+    BlockInput -- "No" --> Embed["Embed question"]
 
-```bash
-make run
-```
+    Embed --> HybridSearch["Hybrid search"]
+    HybridSearch --> Semantic["Semantic match<br/>pgvector cosine similarity"]
+    HybridSearch --> Keyword["Keyword match<br/>exact token overlap"]
+    HybridSearch --> Filters["Optional filters<br/>condition, phase, status"]
 
-Run with auto-reload through Uvicorn:
+    Semantic --> Rank["Blend and rank results"]
+    Keyword --> Rank
+    Filters --> Rank
 
-```bash
-make dev-server
-```
+    Rank --> RetrievalGate{"Relevant chunks found?"}
+    RetrievalGate -- "No" --> NotEnough["Not enough information"]
+    RetrievalGate -- "Yes" --> Context["Retrieved source chunks"]
 
-Ingest data:
+    Context --> LLM["LLM generates grounded answer"]
+    LLM --> OutputGuardrails["Output guardrails<br/>grounding and PII leakage checks"]
+    OutputGuardrails --> OutputBlock{"Grounded answer?"}
+    OutputBlock -- "No" --> Refusal
+    OutputBlock -- "Yes" --> Answer["Stream answer with source traceability"]
 
-```bash
-make ingest-studies
-make ingest-studies CONDITION="Hypertension" MAX_STUDIES=50
-make ingest-condition-set
-```
-
-`make ingest-condition-set` loads a broad local demo set across Type 2 Diabetes, Breast Cancer, Hypertension, and Asthma with 75 studies per condition by default. This gives about 300 studies without trying to ingest all of ClinicalTrials.gov.
-
-Run checks:
-
-```bash
-make test-unit
-make test-integration
-make check
-```
-
-Smoke tests:
-
-```bash
-make ingest-smoke-test
-make query-smoke-test
-```
-
-Useful DB checks:
-
-```bash
-make db-ping
-make db-current
-make db-counts
-make db-extensions
-```
-
-## Query Example
-
-Create a user:
-
-```bash
-curl -X POST http://localhost:8000/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"demo@example.com","password":"secret123"}'
-```
-
-Log in:
-
-```bash
-TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d 'username=demo@example.com&password=secret123' | jq -r .access_token)
-```
-
-Ask a broad question:
-
-```bash
-curl -N -X POST http://localhost:8000/query \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "question":"What eligibility criteria appear across the available clinical trials?",
-    "top_k":3
-  }'
-```
-
-Ask a filtered question:
-
-```bash
-curl -N -X POST http://localhost:8000/query \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "question":"What interventions are being studied in Breast Cancer trials?",
-    "top_k":3,
-    "status":"RECRUITING",
-    "condition":"Breast Cancer"
-  }'
+    Refusal --> Audit["MongoDB audit log"]
+    NotEnough --> Audit
+    Answer --> Audit
 ```
 
 ## Retrieval And Safety
