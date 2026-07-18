@@ -21,7 +21,7 @@ It ingests public ClinicalTrials.gov records, chunks and embeds trial text for s
 ## Architecture
 
 ```mermaid
-flowchart TD
+flowchart LR
     User["User asks a clinical trial question"] --> Web["Web UI or API client"]
     Web --> API["Trial Query Engine<br/>FastAPI backend"]
 
